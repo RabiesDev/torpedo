@@ -18,17 +18,16 @@ type PacketHandler struct {
 }
 
 func NewPacketHandler() *PacketHandler {
-	logger := log.Default()
-	logger.SetName("Handler")
-
 	return &PacketHandler{
-		Logger:   logger,
+		Logger:   log.Default().WithColor(),
 		Handlers: make(map[int]func(earthworm *Earthworm, data []int) [][]byte),
 	}
 }
 
 func (packetHandler *PacketHandler) RegisterHandlers() {
 	packetHandler.RegisterHandler([]int{54}, func(earthworm *Earthworm, data []int) [][]byte {
+		earthworm.Status = "Initializing"
+
 		initializePayload := make([]byte, 4+len(earthworm.Nickname))
 		initializePayload[0] = 115
 		initializePayload[1] = 10
@@ -44,6 +43,8 @@ func (packetHandler *PacketHandler) RegisterHandlers() {
 		}
 	})
 	packetHandler.RegisterHandler([]int{97}, func(earthworm *Earthworm, data []int) [][]byte {
+		earthworm.Status = "Established"
+		earthworm.Initialized = true
 		earthworm.Dead = false
 		earthworm.NeedPing = true
 		return nil
@@ -53,6 +54,7 @@ func (packetHandler *PacketHandler) RegisterHandlers() {
 		return nil
 	})
 	packetHandler.RegisterHandler([]int{118}, func(earthworm *Earthworm, data []int) [][]byte {
+		earthworm.Status = "Dead 💀"
 		earthworm.Dead = true
 		return nil
 	})

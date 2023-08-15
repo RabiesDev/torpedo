@@ -19,7 +19,9 @@ type Earthworm struct {
 	LastPacket     *time.Duration
 	RemoteProxy    string
 	Nickname       string
+	Status         string
 	Connected      bool
+	Initialized    bool
 	NeedPing       bool
 	FailedAttempts int
 
@@ -33,7 +35,7 @@ type Earthworm struct {
 }
 
 func NewEarthworm(remoteProxy string, nickname string) *Earthworm {
-	logger := log.Default()
+	logger := log.Default().WithColor()
 	logger.SetName(nickname)
 
 	return &Earthworm{
@@ -46,14 +48,15 @@ func NewEarthworm(remoteProxy string, nickname string) *Earthworm {
 }
 
 func (earthworm *Earthworm) ConnectToServer(serverAddress string) error {
-	earthworm.Logger.Debugln("Connecting to %s...", serverAddress)
+	earthworm.Logger.Debugln(fmt.Sprintf("Connecting to %s...", serverAddress))
+	earthworm.Status = "Connecting"
 
 	dialer := websocket.Dialer{
 		Proxy: func(request *http.Request) (*url.URL, error) {
 			if len(earthworm.RemoteProxy) > 0 {
 				return url.Parse(earthworm.RemoteProxy)
 			}
-			return nil, nil
+			return http.ProxyFromEnvironment(request)
 		},
 		HandshakeTimeout:  time.Second * 10,
 		EnableCompression: true,
@@ -66,12 +69,14 @@ func (earthworm *Earthworm) ConnectToServer(serverAddress string) error {
 	})
 
 	if err != nil {
+		earthworm.Status = fmt.Sprintf("Disconnected (%s)", err.Error())
 		earthworm.Connected = false
 		earthworm.FailedAttempts++
 		return err
 	}
 
 	earthworm.Conn = conn
+	earthworm.Status = "Connected"
 	earthworm.Connected = true
 	earthworm.FailedAttempts = 0
 	return nil
@@ -79,14 +84,19 @@ func (earthworm *Earthworm) ConnectToServer(serverAddress string) error {
 
 func (earthworm *Earthworm) ConnectionRoutine(packetHandler *PacketHandler) {
 	defer func(Conn *websocket.Conn) {
+		earthworm.Logger.Debugln("Connection closed")
 		_ = Conn.Close()
 	}(earthworm.Conn)
+
+	// hello packet
 	earthworm.WritePacket([]byte{99})
 
-	for earthworm.Conn != nil {
+	for earthworm.Conn != nil && earthworm.Connected {
 		messageType, payload, err := earthworm.Conn.ReadMessage()
 		if err != nil {
-			earthworm.Logger.Error(err.Error())
+			earthworm.Status = fmt.Sprintf("Disconnected (%s)", err.Error())
+			earthworm.Connected = false
+			earthworm.Initialized = false
 			earthworm.FailedAttempts++
 			break
 		} else if messageType != websocket.BinaryMessage {
@@ -100,7 +110,6 @@ func (earthworm *Earthworm) ConnectionRoutine(packetHandler *PacketHandler) {
 
 		payloads, err := packetHandler.HandlePacket(earthworm, data[2], data)
 		if err != nil {
-			packetHandler.Logger.Errorln(err.Error())
 			continue
 		} else if payloads == nil || len(payloads) == 0 {
 			continue
@@ -113,8 +122,11 @@ func (earthworm *Earthworm) ConnectionRoutine(packetHandler *PacketHandler) {
 }
 
 func (earthworm *Earthworm) UpdateAndPing() {
+	if !earthworm.Connected || !earthworm.Initialized {
+		return
+	}
+
 	if earthworm.RoutineTimer.Finish(time.Millisecond*100) && earthworm.Angle != earthworm.PrevAngle {
-		//earthworm.Logger.Debugln("%s updated angles to %v", earthworm.Nickname, math.Floor(earthworm.Angle))
 		earthworm.WritePacket([]byte{byte(math.Floor(earthworm.Angle))})
 		earthworm.PrevAngle = earthworm.Angle
 		earthworm.RoutineTimer.Reset()
@@ -138,6 +150,10 @@ func (earthworm *Earthworm) AngleTo(x, y int) {
 }
 
 func (earthworm *Earthworm) WritePacket(data []byte) {
+	if earthworm.Conn == nil {
+		return
+	}
+
 	if err := earthworm.Conn.WriteMessage(websocket.BinaryMessage, data); err != nil {
 		earthworm.Logger.Error(err.Error())
 	}

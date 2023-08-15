@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"time"
 	"torpedo/internal/helpers"
 	"torpedo/internal/torpedo"
 )
@@ -17,7 +18,14 @@ func main() {
 	}
 
 	wormManager := torpedo.NewWormManager(*serverAddress, proxies, 10)
-	go wormManager.ConnectWorms()
+	wormManager.RegisterWorms()
+	wormManager.ConnectWorms()
 	go wormManager.StartRoutine()
+
+	time.Sleep(time.Second)
 	wormManager.WaitGroup.Wait()
+
+	for {
+		time.Sleep(time.Second)
+	}
 }
