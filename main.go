@@ -3,21 +3,20 @@ package main
 import (
 	"flag"
 	"time"
-	"torpedo/internal/helpers"
 	"torpedo/internal/torpedo"
 )
 
 func main() {
-	serverAddress := flag.String("server-address", "", "")
-	proxiesPath := flag.String("proxies", "proxies.txt", "")
+	configPath := flag.String("config", "config.json", "")
 	flag.Parse()
 
-	proxies, err := helpers.ReadLines(*proxiesPath)
+	config, err := torpedo.ParseConfig(*configPath)
 	if err != nil {
-		// TODO :: error handle
+		return
 	}
 
-	context := torpedo.NewWormManager(*serverAddress, proxies, 5*(len(proxies)+1))
+	proxies := config.ParseProxies()
+	context := torpedo.NewWormManager(config.ServerAddress, proxies, config.PointOffset, 5*(len(proxies)+1))
 	go torpedo.StartSyncServerLocation(context)
 
 	context.RegisterWorms()

@@ -1,0 +1,5 @@
+{
+  "server_address": "",
+  "proxies": "proxies.txt",
+  "point_offset": 15
+}
