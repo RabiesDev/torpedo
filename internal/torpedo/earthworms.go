@@ -19,6 +19,7 @@ type EarthwormManager struct {
 	Earthworms    []*Earthworm
 	Proxies       []string
 	ServerAddress string
+	PointOffset   int
 	Limit         int
 
 	PointMutex sync.Mutex
@@ -26,7 +27,7 @@ type EarthwormManager struct {
 	PointY     int
 }
 
-func NewWormManager(serverAddress string, proxies []string, limit int) *EarthwormManager {
+func NewWormManager(serverAddress string, proxies []string, pointOffset, limit int) *EarthwormManager {
 	packetHandler := NewPacketHandler()
 	packetHandler.RegisterHandlers()
 
@@ -40,6 +41,7 @@ func NewWormManager(serverAddress string, proxies []string, limit int) *Earthwor
 		Earthworms:    make([]*Earthworm, 0),
 		Proxies:       proxies,
 		ServerAddress: serverAddress,
+		PointOffset:   pointOffset,
 		Limit:         limit,
 		PointX:        20000,
 		PointY:        20000,
@@ -101,7 +103,7 @@ func (context *EarthwormManager) StartRoutine() {
 					earthworm.UpdateAndPing()
 					earthworm.AngleTo(context.PointX, context.PointY)
 					context.PointMutex.Unlock()
-					time.Sleep(time.Millisecond * 200)
+					time.Sleep(time.Millisecond * 100)
 				}
 
 				context.Logger.Infoln(earthworm.ToString())
@@ -147,7 +149,7 @@ func (context *EarthwormManager) ReviveAndConnect(earthworm *Earthworm) {
 func (context *EarthwormManager) SetPoints(x, y int) {
 	defer context.PointMutex.Unlock()
 	context.PointMutex.Lock()
-	context.Logger.Infoln(fmt.Sprintf("Synchronization [X: %v, Y: %v]", x, y))
-	context.PointX = x
-	context.PointY = y
+	context.Logger.Debugln(fmt.Sprintf("Synchronization [X: %v, Y: %v]", x, y))
+	context.PointX = x + context.PointOffset
+	context.PointY = y + context.PointOffset
 }
