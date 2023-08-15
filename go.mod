@@ -5,7 +5,6 @@ go 1.20
 require (
 	github.com/RabiesDev/go-logger v0.0.5
 	github.com/fasthttp/websocket v1.5.4
-	github.com/shettyh/threadpool v0.0.0-20200323115144-b99fd8aaa945
 )
 
 require (
