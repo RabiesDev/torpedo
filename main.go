@@ -19,13 +19,9 @@ func main() {
 
 	wormManager := torpedo.NewWormManager(*serverAddress, proxies, 10)
 	wormManager.RegisterWorms()
-	wormManager.ConnectWorms()
+	wormManager.StartConnect()
 	go wormManager.StartRoutine()
 
 	time.Sleep(time.Second)
 	wormManager.WaitGroup.Wait()
-
-	for {
-		time.Sleep(time.Second)
-	}
 }

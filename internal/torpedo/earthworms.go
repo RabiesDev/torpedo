@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/RabiesDev/go-logger"
 	"math/rand"
-	"strconv"
 	"sync"
 	"time"
 	"torpedo/internal/helpers"
@@ -14,7 +13,6 @@ type EarthwormManager struct {
 	Logger        *log.Logger
 	WaitGroup     *sync.WaitGroup
 	TimeoutTimer  *helpers.Stopwatch
-	FlushTimer    *helpers.Stopwatch
 	PacketHandler *PacketHandler
 	EarthwormPool chan struct{}
 	ConnectedChan chan *Earthworm
@@ -32,7 +30,6 @@ func NewWormManager(serverAddress string, proxies []string, limit int) *Earthwor
 		Logger:        log.Default().WithColor(),
 		WaitGroup:     new(sync.WaitGroup),
 		TimeoutTimer:  helpers.NewStopwatch(),
-		FlushTimer:    helpers.NewStopwatch(),
 		PacketHandler: packetHandler,
 		EarthwormPool: make(chan struct{}, limit),
 		ConnectedChan: make(chan *Earthworm, 100),
@@ -60,7 +57,7 @@ func (context *EarthwormManager) RegisterWorms() {
 	}
 }
 
-func (context *EarthwormManager) ConnectWorms() {
+func (context *EarthwormManager) StartConnect() {
 	for _, earthworm := range context.Earthworms {
 		context.WaitGroup.Add(1)
 		context.EarthwormPool <- struct{}{}
@@ -85,35 +82,22 @@ func (context *EarthwormManager) ConnectWorms() {
 
 func (context *EarthwormManager) StartRoutine() {
 	for {
-		if context.FlushTimer.Finish(time.Millisecond * 200) {
-			helpers.FlushConsole()
-			context.FlushTimer.Reset()
-		}
-
 		select {
 		case earthworm := <-context.ConnectedChan:
-			if earthworm.Dead {
-				break
-			}
-
 			context.WaitGroup.Add(1)
 			go func(earthworm *Earthworm) {
 				defer context.WaitGroup.Done()
 				go earthworm.ConnectionRoutine(context.PacketHandler)
 				for !earthworm.Dead && earthworm.Connected {
-					context.Logger.Infoln(fmt.Sprintf("%s [Status: %s, X: %s, Y: %s, Angle: %s]",
-						string(context.Logger.ApplyColor([]byte(earthworm.Nickname), log.Bold)),
-						string(context.Logger.ApplyColor([]byte(earthworm.Status), log.Cyan)),
-						string(context.Logger.ApplyColor([]byte(strconv.Itoa(earthworm.PosX)), log.Blue)),
-						string(context.Logger.ApplyColor([]byte(strconv.Itoa(earthworm.PosY)), log.Blue)),
-						string(context.Logger.ApplyColor([]byte(strconv.FormatFloat(earthworm.Angle, 'f', -1, 64)), log.Orange))),
-					)
-
+					context.Logger.Infoln(earthworm.ToString())
 					context.TimeoutTimer.Reset()
 					earthworm.UpdateAndPing()
 					earthworm.AngleTo(20000, 20000)
 					time.Sleep(time.Millisecond * 200)
 				}
+
+				context.Logger.Infoln(earthworm.ToString())
+				context.ReviveAndConnect(earthworm)
 			}(earthworm)
 		default:
 			if context.TimeoutTimer.Finish(time.Second * 10) {
@@ -121,4 +105,33 @@ func (context *EarthwormManager) StartRoutine() {
 			}
 		}
 	}
+}
+
+func (context *EarthwormManager) ReviveAndConnect(earthworm *Earthworm) {
+	context.Logger.Infoln(fmt.Sprintf("Reviving %s and connecting...", earthworm.Nickname))
+
+	earthworm.Conn = nil
+	earthworm.UniqueId = 0
+	earthworm.Connected = false
+	earthworm.Initialized = false
+	earthworm.Dead = false
+
+	context.WaitGroup.Add(1)
+	context.EarthwormPool <- struct{}{}
+
+	go func(earthworm *Earthworm) {
+		defer func() {
+			<-context.EarthwormPool
+			context.WaitGroup.Done()
+		}()
+
+		err := earthworm.ConnectToServer(context.ServerAddress)
+		if err != nil {
+			earthworm.Logger.Errorln(err.Error())
+			return
+		}
+
+		context.ConnectedChan <- earthworm
+		context.TimeoutTimer.Reset()
+	}(earthworm)
 }

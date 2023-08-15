@@ -7,6 +7,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"strconv"
 	"time"
 	"torpedo/internal/helpers"
 )
@@ -122,7 +123,7 @@ func (earthworm *Earthworm) ConnectionRoutine(packetHandler *PacketHandler) {
 }
 
 func (earthworm *Earthworm) UpdateAndPing() {
-	if !earthworm.Connected || !earthworm.Initialized {
+	if !earthworm.Connected || !earthworm.Initialized || earthworm.Dead {
 		return
 	}
 
@@ -162,4 +163,14 @@ func (earthworm *Earthworm) WritePacket(data []byte) {
 func (earthworm *Earthworm) UpdateLastPacket() {
 	now := time.Since(time.Now())
 	earthworm.LastPacket = &now
+}
+
+func (earthworm *Earthworm) ToString() string {
+	return fmt.Sprintf("%s [Status: %s, X: %s, Y: %s, Angle: %s]",
+		string(earthworm.Logger.ApplyColor([]byte(earthworm.Nickname), log.Bold)),
+		string(earthworm.Logger.ApplyColor([]byte(earthworm.Status), log.Cyan)),
+		string(earthworm.Logger.ApplyColor([]byte(strconv.Itoa(earthworm.PosX)), log.Blue)),
+		string(earthworm.Logger.ApplyColor([]byte(strconv.Itoa(earthworm.PosY)), log.Blue)),
+		string(earthworm.Logger.ApplyColor([]byte(strconv.FormatFloat(earthworm.Angle, 'f', -1, 64)), log.Orange)),
+	)
 }
