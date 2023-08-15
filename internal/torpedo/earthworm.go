@@ -36,11 +36,8 @@ type Earthworm struct {
 }
 
 func NewEarthworm(remoteProxy string, nickname string) *Earthworm {
-	logger := log.Default().WithColor()
-	logger.SetName(nickname)
-
 	return &Earthworm{
-		Logger:       logger,
+		Logger:       log.Default().WithColor(),
 		RoutineTimer: helpers.NewStopwatch(),
 		PingTimer:    helpers.NewStopwatch(),
 		RemoteProxy:  remoteProxy,
@@ -64,9 +61,11 @@ func (earthworm *Earthworm) ConnectToServer(serverAddress string) error {
 	}
 
 	conn, _, err := dialer.Dial(fmt.Sprintf("ws://%s/slither", serverAddress), http.Header{
-		"origin":        {"http://slither.io"},
-		"cache-control": {"no-cache"},
-		"pragma":        {"no-cache"},
+		"User-Agent":      {"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"},
+		"Accept-Encoding": {"gzip, deflate"},
+		"origin":          {"http://slither.io"},
+		"cache-control":   {"no-cache"},
+		"pragma":          {"no-cache"},
 	})
 
 	if err != nil {

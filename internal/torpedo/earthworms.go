@@ -42,7 +42,7 @@ func NewWormManager(serverAddress string, proxies []string, limit int) *Earthwor
 
 func (context *EarthwormManager) RegisterWorms() {
 	registerWorms := func(context *EarthwormManager, proxy string) {
-		for i := 0; i < 2; i++ {
+		for i := 0; i < 3; i++ {
 			nickname := fmt.Sprintf("Torpedo_%v", rand.Intn(9999))
 			context.Earthworms = append(context.Earthworms, NewEarthworm(proxy, nickname))
 		}
