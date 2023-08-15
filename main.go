@@ -17,7 +17,7 @@ func main() {
 		// TODO :: error handle
 	}
 
-	wormManager := torpedo.NewWormManager(*serverAddress, proxies, 10)
+	wormManager := torpedo.NewWormManager(*serverAddress, proxies, 5*(len(proxies)+1))
 	wormManager.RegisterWorms()
 	wormManager.StartConnect()
 	go wormManager.StartRoutine()
