@@ -17,11 +17,13 @@ func main() {
 		// TODO :: error handle
 	}
 
-	wormManager := torpedo.NewWormManager(*serverAddress, proxies, 5*(len(proxies)+1))
-	wormManager.RegisterWorms()
-	wormManager.StartConnect()
-	go wormManager.StartRoutine()
+	context := torpedo.NewWormManager(*serverAddress, proxies, 5*(len(proxies)+1))
+	go torpedo.StartSyncServerLocation(context)
+
+	context.RegisterWorms()
+	context.StartConnect()
+	go context.StartRoutine()
 
 	time.Sleep(time.Second)
-	wormManager.WaitGroup.Wait()
+	context.WaitGroup.Wait()
 }

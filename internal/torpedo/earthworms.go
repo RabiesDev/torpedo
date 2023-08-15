@@ -20,6 +20,10 @@ type EarthwormManager struct {
 	Proxies       []string
 	ServerAddress string
 	Limit         int
+
+	PointMutex sync.Mutex
+	PointX     int
+	PointY     int
 }
 
 func NewWormManager(serverAddress string, proxies []string, limit int) *EarthwormManager {
@@ -32,18 +36,20 @@ func NewWormManager(serverAddress string, proxies []string, limit int) *Earthwor
 		TimeoutTimer:  helpers.NewStopwatch(),
 		PacketHandler: packetHandler,
 		EarthwormPool: make(chan struct{}, limit),
-		ConnectedChan: make(chan *Earthworm, 100),
+		ConnectedChan: make(chan *Earthworm, limit),
 		Earthworms:    make([]*Earthworm, 0),
 		Proxies:       proxies,
 		ServerAddress: serverAddress,
 		Limit:         limit,
+		PointX:        20000,
+		PointY:        20000,
 	}
 }
 
 func (context *EarthwormManager) RegisterWorms() {
 	registerWorms := func(context *EarthwormManager, proxy string) {
 		for i := 0; i < 3; i++ {
-			nickname := fmt.Sprintf("Torpedo_%v", rand.Intn(9999))
+			nickname := fmt.Sprintf("Torpedo_%v", rand.Intn(99999))
 			context.Earthworms = append(context.Earthworms, NewEarthworm(proxy, nickname))
 		}
 	}
@@ -91,8 +97,10 @@ func (context *EarthwormManager) StartRoutine() {
 				for !earthworm.Dead && earthworm.Connected {
 					context.Logger.Infoln(earthworm.ToString())
 					context.TimeoutTimer.Reset()
+					context.PointMutex.Lock()
 					earthworm.UpdateAndPing()
-					earthworm.AngleTo(20000, 20000)
+					earthworm.AngleTo(context.PointX, context.PointY)
+					context.PointMutex.Unlock()
 					time.Sleep(time.Millisecond * 200)
 				}
 
@@ -110,11 +118,11 @@ func (context *EarthwormManager) StartRoutine() {
 func (context *EarthwormManager) ReviveAndConnect(earthworm *Earthworm) {
 	context.Logger.Infoln(fmt.Sprintf("Reviving %s and connecting...", earthworm.Nickname))
 
-	earthworm.Conn = nil
-	earthworm.UniqueId = 0
-	earthworm.Connected = false
 	earthworm.Initialized = false
+	earthworm.Connected = false
 	earthworm.Dead = false
+	earthworm.UniqueId = 0
+	earthworm.Conn = nil
 
 	context.WaitGroup.Add(1)
 	context.EarthwormPool <- struct{}{}
@@ -134,4 +142,12 @@ func (context *EarthwormManager) ReviveAndConnect(earthworm *Earthworm) {
 		context.ConnectedChan <- earthworm
 		context.TimeoutTimer.Reset()
 	}(earthworm)
+}
+
+func (context *EarthwormManager) SetPoints(x, y int) {
+	defer context.PointMutex.Unlock()
+	context.PointMutex.Lock()
+	context.Logger.Infoln(fmt.Sprintf("Synchronization [X: %v, Y: %v]", x, y))
+	context.PointX = x
+	context.PointY = y
 }
